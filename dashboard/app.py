@@ -56,6 +56,21 @@ with st.sidebar:
             ["EC2", "S3", "Lambda", "RDS"],
             default=["EC2", "S3", "Lambda", "RDS"],
         )
+
+        st.markdown("### Date Range")
+        _ms_raw_for_dates = st.session_state.get("ms_df")
+        _date_min = pd.Timestamp("2024-01-01").date()
+        _date_max = pd.Timestamp("2024-12-31").date()
+        if _ms_raw_for_dates is not None:
+            _date_min = pd.Timestamp(_ms_raw_for_dates["date"].min()).date()
+            _date_max = pd.Timestamp(_ms_raw_for_dates["date"].max()).date()
+        date_range = st.date_input(
+            "Select Range",
+            value=(_date_min, _date_max),
+            min_value=_date_min,
+            max_value=_date_max,
+        )
+
         regenerate = st.button("🔄 Regenerate Data")
     else:
         zscore_threshold = st.slider(
@@ -130,15 +145,47 @@ if data_source == "Multi-Service View":
             ms_raw = root_cause_attribution(ms_raw)
         st.session_state["ms_df"] = ms_raw
 
-    ms = st.session_state["ms_df"]
+    ms_full = st.session_state["ms_df"]
+
+    # ── Date range filter ─────────────────────────────────────────────────────
+    if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
+        ms = ms_full[
+            (ms_full["date"] >= pd.Timestamp(date_range[0])) &
+            (ms_full["date"] <= pd.Timestamp(date_range[1]))
+        ].reset_index(drop=True)
+    else:
+        ms = ms_full.copy()
 
     _SVC_COLOR = {"EC2": "royalblue", "S3": "limegreen", "Lambda": "orange", "RDS": "mediumpurple"}
-    _SVC_LOWER = {s: s.lower() for s in ["EC2", "S3", "Lambda", "RDS"]}
+
+    # ── Anomaly count banner ──────────────────────────────────────────────────
+    b1, b2, b3, b4 = st.columns(4)
+    for col_widget, svc in zip([b1, b2, b3, b4], ["EC2", "S3", "Lambda", "RDS"]):
+        svc_l = svc.lower()
+        with col_widget:
+            st.metric(
+                label=f"{svc} Anomalies",
+                value=int(ms[f"is_anomaly_{svc_l}"].sum()),
+                delta=f"${ms[f'cost_{svc_l}'].mean():.0f} avg/day",
+            )
+
+    # ── Peak anomaly card ─────────────────────────────────────────────────────
+    peak_df = ms[ms["is_anomaly_any"]]
+    if not peak_df.empty:
+        peak_row = peak_df.loc[peak_df["cost_total"].idxmax()]
+        peak_date  = pd.Timestamp(peak_row["date"]).strftime("%Y-%m-%d")
+        peak_cost  = float(peak_row["cost_total"])
+        peak_cause = str(peak_row.get("root_cause", "Unknown"))
+        st.markdown(
+            f"> **Peak Anomaly** — {peak_date} | **${peak_cost:.2f}** | Source: **{peak_cause}**"
+        )
 
     # ── Multi-service chart ───────────────────────────────────────────────────
     fig = go.Figure()
+
+    # Per-service lines + anomaly markers
     for svc in selected_services:
-        svc_l = svc.lower()
+        svc_l    = svc.lower()
         cost_col = f"cost_{svc_l}"
         fig.add_trace(go.Scatter(
             x=ms["date"], y=ms[cost_col],
@@ -154,26 +201,32 @@ if data_source == "Multi-Service View":
             showlegend=True,
         ))
 
+    # Total cost line
+    fig.add_trace(go.Scatter(
+        x=ms["date"], y=ms["cost_total"],
+        mode="lines", name="Total Cost",
+        line=dict(color="white", width=2.5, dash="dot"),
+        opacity=0.85,
+    ))
+
     fig.update_layout(
         title="Multi-Service Cloud Cost with Anomaly Detection",
         xaxis_title="Date", yaxis_title="Cost ($)",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        height=500,
+        height=520,
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # ── Service metric cards ──────────────────────────────────────────────────
+    # ── Service summary cards ─────────────────────────────────────────────────
     st.subheader("Per-Service Summary")
     cols = st.columns(4)
     for i, svc in enumerate(["EC2", "S3", "Lambda", "RDS"]):
         svc_l = svc.lower()
         with cols[i]:
             st.markdown(f"**{svc}**")
-            n_anom  = int(ms[f"is_anomaly_{svc_l}"].sum())
-            total_c = ms[f"cost_{svc_l}"].sum()
-            st.metric("Anomalies",     n_anom)
-            st.metric("Total Cost",    f"${total_c:,.0f}")
-            st.metric("Avg Daily",     f"${ms[f'cost_{svc_l}'].mean():.1f}")
+            st.metric("Anomalies",  int(ms[f"is_anomaly_{svc_l}"].sum()))
+            st.metric("Total Cost", f"${ms[f'cost_{svc_l}'].sum():,.0f}")
+            st.metric("Avg Daily",  f"${ms[f'cost_{svc_l}'].mean():.1f}")
 
     # ── Root-cause table ──────────────────────────────────────────────────────
     st.subheader("Root Cause Attribution")
