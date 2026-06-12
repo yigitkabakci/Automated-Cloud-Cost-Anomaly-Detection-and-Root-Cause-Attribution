@@ -1,0 +1,44 @@
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
+
+DATA_DIR = BASE_DIR / "data"
+DETECTION_DIR = BASE_DIR / "detection"
+DASHBOARD_DIR = BASE_DIR / "dashboard"
+EVALUATION_DIR = BASE_DIR / "evaluation"
+
+# Anomaly detection thresholds
+Z_SCORE_THRESHOLD = 3.0
+IQR_MULTIPLIER = 1.5
+ISOLATION_FOREST_CONTAMINATION = 0.05
+
+# Z-score engine
+ZSCORE_THRESHOLD = 2.5
+STL_PERIOD = 7
+
+# Isolation Forest engine
+IF_CONTAMINATION = 0.03
+IF_N_ESTIMATORS = 100
+
+# Cost analysis
+COST_CURRENCY = "USD"
+ROLLING_WINDOW_DAYS = 7
+SEASONALITY_PERIOD = 30
+
+# Dashboard
+DASHBOARD_HOST = "localhost"
+DASHBOARD_PORT = 8501
+
+# Data
+RAW_DATA_FILE = DATA_DIR / "cloud_costs.csv"
+PROCESSED_DATA_FILE = DATA_DIR / "processed_costs.csv"
+
+# Data generation
+SEED = 42
+N_DAYS = 365
+BASE_COST = 200.0
+TREND_SLOPE = 0.15
+SEASONALITY_AMPLITUDE = 40.0
+NOISE_STD = 15.0
+N_ANOMALIES = 12
+ANOMALY_MULTIPLIER_RANGE = (2.5, 6.0)
