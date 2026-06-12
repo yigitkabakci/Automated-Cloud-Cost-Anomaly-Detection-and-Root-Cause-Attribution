@@ -3,6 +3,9 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -18,6 +21,7 @@ from detection.prophet_engine import detect_prophet
 from detection.sarima_engine import detect_sarima
 from detection.multiservice_detector import detect_multiservice, root_cause_attribution
 from evaluation.metrics import calculate_metrics
+from notifications.slack_notifier import send_slack_alert, test_slack_connection
 import config
 
 
@@ -68,6 +72,50 @@ with st.sidebar:
         show_sarima  = st.checkbox("Show SARIMA",  value=True)
         st.divider()
         regenerate = st.button("🔄 Regenerate / Reload Data")
+
+    # ── Slack notifications (all sources) ────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 🔔 Notifications")
+
+    webhook_url = st.text_input(
+        "Slack Webhook URL",
+        value=os.getenv("SLACK_WEBHOOK_URL", ""),
+        type="password",
+    )
+    enable_slack = st.checkbox("Enable Slack Alerts", value=False)
+
+    if st.button("Test Connection"):
+        if webhook_url:
+            if test_slack_connection(webhook_url):
+                st.success("✅ Connected!")
+            else:
+                st.error("❌ Connection failed!")
+        else:
+            st.warning("Webhook URL gerekli")
+
+
+# ── Session state: track already-sent anomalies ───────────────────────────────
+if "slack_sent" not in st.session_state:
+    st.session_state.slack_sent = set()
+
+
+def _send_new_anomalies(anomaly_df: pd.DataFrame) -> None:
+    """Send only anomalies not yet dispatched this session."""
+    new = anomaly_df[
+        ~anomaly_df.apply(
+            lambda r: f"{r['date']}_{r['cost']}" in st.session_state.slack_sent,
+            axis=1,
+        )
+    ]
+    if len(new) == 0:
+        st.info("ℹ️ Yeni anomali yok — tümü zaten bildirildi.")
+        return
+    if send_slack_alert(new[["date", "cost", "root_cause"]], webhook_url):
+        for _, row in new.iterrows():
+            st.session_state.slack_sent.add(f"{row['date']}_{row['cost']}")
+        st.success(f"✅ {len(new)} yeni anomali Slack'e bildirildi!")
+    else:
+        st.error("❌ Slack bildirimi gönderilemedi!")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -137,6 +185,14 @@ if data_source == "Multi-Service View":
 
     with st.expander("📊 Raw Multi-Service Data"):
         st.dataframe(ms, use_container_width=True)
+
+    # ── Slack alerts (multi-service) ──────────────────────────────────────────
+    if enable_slack and webhook_url:
+        anom_rows = ms[ms["is_anomaly_any"]].copy()
+        anom_rows = anom_rows.rename(columns={"cost_total": "cost"})
+        if "root_cause" not in anom_rows.columns:
+            anom_rows["root_cause"] = "Unknown"
+        _send_new_anomalies(anom_rows)
 
     st.stop()
 
@@ -313,3 +369,11 @@ st.dataframe(comparison_df, use_container_width=True)
 # ── Raw data expander ─────────────────────────────────────────────────────────
 with st.expander("📊 Raw Data"):
     st.dataframe(df, use_container_width=True)
+
+
+# ── Slack alerts (single-series) ──────────────────────────────────────────────
+if enable_slack and webhook_url:
+    anomaly_rows = df[df["is_anomaly"]].copy()
+    if "root_cause" not in anomaly_rows.columns:
+        anomaly_rows["root_cause"] = data_source
+    _send_new_anomalies(anomaly_rows)
