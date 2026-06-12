@@ -27,7 +27,7 @@ def detect_sarima(df: pd.DataFrame) -> pd.DataFrame:
 
     fitted = result.fittedvalues
     residual = df["cost"] - fitted
-    threshold = 2 * residual.std()
+    threshold = 3 * residual.std()
     df["sarima_anomaly"] = residual.abs() > threshold
 
     return df
