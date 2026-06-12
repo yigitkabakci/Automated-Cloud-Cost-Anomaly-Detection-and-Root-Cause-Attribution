@@ -1,44 +1,90 @@
-# Automated Cloud Cost Anomaly Detection and Root Cause Attribution
+# Automated Cloud Cost Anomaly Detection and Root-Cause Attribution
 
-A Python-based system for detecting anomalies in cloud infrastructure costs and attributing root causes to specific services, regions, or usage patterns.
+**Konya Food and Agriculture University**
+Mert Kırçiçek (232010020044) · Yiğit Kabakcı (212010020092)
 
-## Features
+---
 
-- Statistical anomaly detection (Z-score, IQR, Isolation Forest)
-- Time-series analysis with seasonality-aware thresholds
-- Interactive Streamlit dashboard with Plotly visualizations
-- Root cause attribution across services and regions
-- Automated evaluation metrics for detection accuracy
+## Overview
+
+This project treats cloud billing data as a real-time observability telemetry stream.
+It detects anomalous expenditures using statistical (Z-Score + STL) and machine learning
+(Isolation Forest) methods, and visualizes results on an interactive Streamlit dashboard.
+
+---
 
 ## Project Structure
 
 ```
-├── data/          # Raw and processed cost datasets
-├── detection/     # Anomaly detection algorithms
-├── dashboard/     # Streamlit dashboard app
-├── evaluation/    # Detection evaluation and metrics
-├── tests/         # Unit and integration tests
-├── config.py      # Project-wide constants
+cloud-cost-anomaly/
+
+├── data/
+
+│   └── generator.py        # Synthetic time-series data generator
+
+├── detection/
+
+│   ├── zscore_engine.py     # STL decomposition + rolling Z-score
+
+│   └── isolation_forest.py  # Isolation Forest anomaly detection
+
+├── dashboard/
+
+│   └── app.py              # Streamlit interactive dashboard
+
+├── evaluation/
+
+│   └── metrics.py          # Precision, Recall, F1 comparison
+
+├── tests/                  # Unit tests for all modules
+
+├── main.py                 # Pipeline entry point
+
+├── config.py               # Central configuration
+
 └── requirements.txt
 ```
+
+---
 
 ## Setup
 
 ```bash
 python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # macOS/Linux
+venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Run Dashboard
+---
 
+## Usage
+
+Run full pipeline:
+```bash
+python main.py
+```
+
+Launch dashboard:
 ```bash
 streamlit run dashboard/app.py
 ```
 
-## Run Tests
-
+Run tests:
 ```bash
-pytest tests/
+pytest tests/ -v
 ```
+
+---
+
+## Detection Methods
+
+| Method | Approach | Strength |
+|---|---|---|
+| Z-Score + STL | Statistical | Fast, interpretable |
+| Isolation Forest | Machine Learning | Handles complex patterns |
+
+---
+
+## Tech Stack
+
+Python 3.10 · Pandas · NumPy · Scikit-learn · Statsmodels · SciPy · Streamlit · Plotly
