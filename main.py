@@ -6,6 +6,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from data.generator import generate_cost_data
 from detection.zscore_engine import detect_zscore
 from detection.isolation_forest import detect_isolation_forest
+from detection.prophet_engine import detect_prophet
+from detection.sarima_engine import detect_sarima
 from evaluation.metrics import compare_models
 from config import DATA_DIR
 
@@ -19,6 +21,12 @@ def main():
 
     print("Running Isolation Forest detection...")
     df = detect_isolation_forest(df)
+
+    print("Running Prophet detection...")
+    df = detect_prophet(df)
+
+    print("Running SARIMA detection...")
+    df = detect_sarima(df)
 
     compare_models(df)
 

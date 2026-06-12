@@ -28,14 +28,20 @@ def calculate_metrics(y_true, y_pred, model_name: str) -> dict:
 def compare_models(df: pd.DataFrame) -> None:
     y_true = df["is_anomaly"]
 
-    zscore_metrics = calculate_metrics(y_true, df["zscore_anomaly"], "Z-Score (STL)")
-    if_metrics = calculate_metrics(y_true, df["if_anomaly"], "Isolation Forest")
+    rows = [
+        calculate_metrics(y_true, df["zscore_anomaly"],    "Z-Score (STL)"),
+        calculate_metrics(y_true, df["if_anomaly"],        "Isolation Forest"),
+        calculate_metrics(y_true, df["prophet_anomaly"],   "Prophet"),
+        calculate_metrics(y_true, df["sarima_anomaly"],    "SARIMA"),
+    ]
 
-    rows = [zscore_metrics, if_metrics]
     result_df = pd.DataFrame(rows).set_index("model")
 
     print("\n" + "=" * 60)
     print("MODEL COMPARISON")
     print("=" * 60)
     print(result_df.to_string())
-    print("=" * 60 + "\n")
+    print("=" * 60)
+
+    best = max(rows, key=lambda r: r["f1"])
+    print(f"Best Model: {best['model']}  (F1 = {best['f1']:.4f})\n")
